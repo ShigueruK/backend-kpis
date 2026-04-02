@@ -1,38 +1,18 @@
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import create_engine, Column, Integer, String
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy.orm import Session
 from pydantic import BaseModel
-
-DATABASE_URL = "postgresql://postgres:Matier620@localhost/kpi_dashboard"
-
-engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
-
-# --- Modelos SQLAlchemy (reflejan las tablas) ---
-class VentasMensualesDB(Base):
-    __tablename__ = "ventas_mensuales"
-    id = Column(Integer, primary_key=True, index=True)
-    mes = Column(String)
-    ventas = Column(Integer)
-    objetivo = Column(Integer)
-
-class TopProductosDB(Base):
-    __tablename__ = "top_productos"
-    id = Column(Integer, primary_key=True, index=True)
-    nombre = Column(String)
-    ventas = Column(Integer)
-
-class CumplimientoDB(Base):
-    __tablename__ = "cumplimiento"
-    id = Column(Integer, primary_key=True, index=True)
-    promedio = Column(Integer)
-    meses_sobre_objetivo = Column(Integer)
-    mejor_mes = Column(String)
-
-# --- Esquemas Pydantic (para validación y serialización) ---
+from fastapi.middleware.cors import CORSMiddleware
+from database import engine, get_db
+from models import Usuario, VentasMensualesDB, TopProductosDB, CumplimientoDB
+from auth import authenticate_user, create_access_token, get_current_user, get_password_hash
+from database import engine, get_db, Base
+# Esquemas Pydantic para respuestas
+class UsuarioRegistro(BaseModel):
+    nombre: str
+    email: str
+    password: str
+    rol: str = "vendedor"
 class VentasMensuales(BaseModel):
     mes: str
     ventas: int
@@ -47,44 +27,58 @@ class Cumplimiento(BaseModel):
     meses_sobre_objetivo: int
     mejor_mes: str
 
-# --- Crear la app FastAPI ---
+# Crear la app
 app = FastAPI()
 
-# Configurar CORS para permitir peticiones desde React (localhost:3000)
+# CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=["*"],   
+    allow_credentials=False,
+    allow_methods=["*"],                  
+    allow_headers=["*"],                       
 )
+from database import Base
+Base.metadata.create_all(bind=engine)
 
-# --- Dependencia para obtener sesión de BD ---
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+# --- Endpoints públicos ---
+@app.post("/registro")
+def register(usuario: UsuarioRegistro, db: Session = Depends(get_db)):
+    user = db.query(Usuario).filter(Usuario.email == usuario.email).first()
+    if user:
+        raise HTTPException(status_code=400, detail="El email ya está registrado")
+    hashed = get_password_hash(usuario.password)
+    nuevo_usuario = Usuario(
+        nombre=usuario.nombre,
+        email=usuario.email,
+        hashed_password=hashed,
+        rol=usuario.rol
+    )
+    db.add(nuevo_usuario)
+    db.commit()
+    db.refresh(nuevo_usuario)
+    return {"msg": "Usuario creado exitosamente", "email": nuevo_usuario.email}
 
-# --- Endpoints ---
+@app.post("/login")
+def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    user = authenticate_user(db, form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(status_code=401, detail="Credenciales incorrectas")
+    access_token = create_access_token(data={"sub": user.email})
+    return {"access_token": access_token, "token_type": "bearer", "rol": user.rol}
+
+# --- Endpoints protegidos (requieren token) ---
 @app.get("/ventas-mensuales", response_model=list[VentasMensuales])
-def get_ventas():
-    db = SessionLocal()
+def get_ventas(current_user: Usuario = Depends(get_current_user), db: Session = Depends(get_db)):
     ventas = db.query(VentasMensualesDB).order_by(VentasMensualesDB.id).all()
-    db.close()
     return ventas
 
 @app.get("/top-productos", response_model=list[TopProductos])
-def get_top_productos():
-    db = SessionLocal()
+def get_top_productos(current_user: Usuario = Depends(get_current_user), db: Session = Depends(get_db)):
     productos = db.query(TopProductosDB).order_by(TopProductosDB.ventas.desc()).all()
-    db.close()
     return productos
 
 @app.get("/cumplimiento", response_model=Cumplimiento)
-def get_cumplimiento():
-    db = SessionLocal()
+def get_cumplimiento(current_user: Usuario = Depends(get_current_user), db: Session = Depends(get_db)):
     cumplimiento = db.query(CumplimientoDB).first()
-    db.close()
     return cumplimiento
-
