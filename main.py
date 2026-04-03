@@ -64,7 +64,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     user = authenticate_user(db, form_data.username, form_data.password)
     if not user:
         raise HTTPException(status_code=401, detail="Credenciales incorrectas")
-    access_token = create_access_token(data={"sub": user.email})
+    access_token = create_access_token(data={"sub": user.email, "rol": user.rol})
     return {"access_token": access_token, "token_type": "bearer", "rol": user.rol}
 
 # --- Endpoints protegidos (requieren token) ---
@@ -82,3 +82,11 @@ def get_top_productos(current_user: Usuario = Depends(get_current_user), db: Ses
 def get_cumplimiento(current_user: Usuario = Depends(get_current_user), db: Session = Depends(get_db)):
     cumplimiento = db.query(CumplimientoDB).first()
     return cumplimiento
+
+@app.post("/login")
+def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    user = authenticate_user(db, form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(status_code=401, detail="Credenciales incorrectas")
+    access_token = create_access_token(data={"sub": user.email, "rol": user.rol})
+    return {"access_token": access_token, "token_type": "bearer", "rol": user.rol}
