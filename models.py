@@ -1,6 +1,13 @@
 from sqlalchemy import Column, Integer, String, DateTime, func
 from database import Base
 
+class VentasPorCategoriaDB(Base):
+    __tablename__ = "ventas_por_categoria"
+    id = Column(Integer, primary_key=True, index=True)
+    categoria = Column(String)
+    ventas = Column(Integer)
+    mes = Column(String)
+    año = Column(Integer)
 class Usuario(Base):
     __tablename__ = "usuarios"
     id = Column(Integer, primary_key=True, index=True)

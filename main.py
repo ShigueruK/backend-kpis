@@ -4,10 +4,9 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from database import engine, get_db
-from models import Usuario, VentasMensualesDB, TopProductosDB, CumplimientoDB
+from models import Usuario, VentasMensualesDB, TopProductosDB, CumplimientoDB, VentasPorCategoriaDB
 from auth import authenticate_user, create_access_token, get_current_user, get_password_hash
 from database import engine, get_db, Base
-# Esquemas Pydantic para respuestas
 class UsuarioRegistro(BaseModel):
     nombre: str
     email: str
@@ -26,7 +25,11 @@ class Cumplimiento(BaseModel):
     promedio: int
     meses_sobre_objetivo: int
     mejor_mes: str
-
+class VentasPorCategoria(BaseModel):
+    categoria: str
+    ventas: int
+    mes: str
+    año: int
 # Crear la app
 app = FastAPI()
 
@@ -90,3 +93,26 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
         raise HTTPException(status_code=401, detail="Credenciales incorrectas")
     access_token = create_access_token(data={"sub": user.email, "rol": user.rol})
     return {"access_token": access_token, "token_type": "bearer", "rol": user.rol}
+
+@app.get("/ventas-por-categoria", response_model=list[VentasPorCategoria])
+def get_ventas_por_categoria(
+    current_user: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    # Solo admin o gerente pueden ver este KPI
+    if current_user.rol not in ["admin", "gerente"]:
+        raise HTTPException(status_code=403, detail="No autorizado")
+    
+    ventas_cat = db.query(VentasPorCategoriaDB).all()
+    return ventas_cat
+
+@app.get("/perfil")
+def get_perfil(current_user: Usuario = Depends(get_current_user)):
+    return {
+        "id": current_user.id,
+        "nombre": current_user.nombre,
+        "email": current_user.email,
+        "rol": current_user.rol,
+        "created_at": str(current_user.created_at)
+    }
+
