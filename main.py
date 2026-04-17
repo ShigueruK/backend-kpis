@@ -86,14 +86,6 @@ def get_cumplimiento(current_user: Usuario = Depends(get_current_user), db: Sess
     cumplimiento = db.query(CumplimientoDB).first()
     return cumplimiento
 
-@app.post("/login")
-def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    user = authenticate_user(db, form_data.username, form_data.password)
-    if not user:
-        raise HTTPException(status_code=401, detail="Credenciales incorrectas")
-    access_token = create_access_token(data={"sub": user.email, "rol": user.rol})
-    return {"access_token": access_token, "token_type": "bearer", "rol": user.rol}
-
 @app.get("/ventas-por-categoria", response_model=list[VentasPorCategoria])
 def get_ventas_por_categoria(
     current_user: Usuario = Depends(get_current_user),
