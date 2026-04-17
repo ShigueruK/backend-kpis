@@ -7,7 +7,7 @@ class VentasPorCategoriaDB(Base):
     categoria = Column(String)
     ventas = Column(Integer)
     mes = Column(String)
-    año = Column(Integer)
+    anio = Column(Integer)
 class Usuario(Base):
     __tablename__ = "usuarios"
     id = Column(Integer, primary_key=True, index=True)

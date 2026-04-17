@@ -29,7 +29,7 @@ class VentasPorCategoria(BaseModel):
     categoria: str
     ventas: int
     mes: str
-    año: int
+    anio: int
 # Crear la app
 app = FastAPI()
 
