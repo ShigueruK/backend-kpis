@@ -75,3 +75,7 @@ Vendedor: vendedor@example.com / vendedor123
 🌐 Despliegue
 El backend está desplegado en Render: https://backend-kpis.onrender.com
 (Tengo que reemplazarlo cuando lo tenga listo)
+
+## 📄 Licencia
+
+MIT
